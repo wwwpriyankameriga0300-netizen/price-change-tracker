@@ -17,14 +17,16 @@ st.info(
 """
 Upload two Excel files.
 
-Required columns:
+Required columns in the Excel files:
 
 Product Name  
 Price  
-ID
+ID  
 
-Green = price increase  
-Red = price decrease
+Extra columns like web_scraper_url or web_scraper_order will be ignored.
+
+🟢 Green = price increase  
+🔴 Red = price decrease
 """
 )
 
@@ -34,10 +36,11 @@ files = st.file_uploader(
     accept_multiple_files=True
 )
 
+
 if st.button("🚀 Generate Price Change Report"):
 
     if not files or len(files) < 2:
-        st.error("Please upload at least TWO Excel files")
+        st.error("Please upload at least TWO Excel files.")
     else:
 
         try:
@@ -56,14 +59,12 @@ if st.button("🚀 Generate Price Change Report"):
 
             st.dataframe(df, use_container_width=True)
 
+            # ---------- CREATE EXCEL ----------
             temp_output = BytesIO()
-
             df.to_excel(temp_output, index=False)
-
             temp_output.seek(0)
 
             wb = load_workbook(temp_output)
-
             ws = wb.active
 
             green_fill = PatternFill(
@@ -81,7 +82,6 @@ if st.button("🚀 Generate Price Change Report"):
             change_col_letter = None
 
             for col in ws.iter_cols(1, ws.max_column):
-
                 if col[0].value == "Change_Amount":
                     change_col_letter = col[0].column_letter
                     break
@@ -107,9 +107,7 @@ if st.button("🚀 Generate Price Change Report"):
                 )
 
             final_output = BytesIO()
-
             wb.save(final_output)
-
             final_output.seek(0)
 
             st.download_button(
