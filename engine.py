@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
 import re
+from datetime import datetime
 
 
 # ---------- CLEAN PRICE ----------
 def clean_price(x):
+
     if pd.isna(x):
         return np.nan
 
@@ -20,6 +22,7 @@ def clean_price(x):
 
 # ---------- CLEAN ID ----------
 def clean_id(x):
+
     if pd.isna(x):
         return None
 
@@ -29,60 +32,108 @@ def clean_id(x):
     return match.group(1) if match else x.strip()
 
 
+# ---------- EXTRACT DATE ----------
+def extract_date(filename):
+
+    m = re.search(r'(\d{1,2})[_-](\d{1,2})[_-](\d{2,4})', filename)
+
+    if not m:
+        return None
+
+    d, mth, y = m.groups()
+
+    y = int(y)
+    if y < 100:
+        y += 2000
+
+    try:
+        return datetime(y, int(mth), int(d)).date()
+    except:
+        return None
+
+
+# ---------- TIME RANK ----------
+def time_rank(filename):
+
+    name = filename.lower()
+
+    if "morning" in name or re.search(r'\bmor\b', name):
+        return 0
+
+    if "afternoon" in name or re.search(r'\baft\b', name):
+        return 1
+
+    if "evening" in name or re.search(r'\beve\b', name):
+        return 2
+
+    return 3
+
+
 # ---------- MAIN FUNCTION ----------
 def generate_price_change_report(files):
 
-    dfs = []
-    labels = []
+    file_meta = []
 
-    for file in files:
+    for f in files:
 
-        label = file.name.replace(".xlsx", "")
-        labels.append(label)
+        name = f.name
 
-        df = pd.read_excel(file)
+        dt = extract_date(name)
+        tr = time_rank(name)
 
-        # remove spaces in column names
-        df.columns = df.columns.str.strip()
+        if dt is None:
+            raise ValueError(f"Could not detect date in filename: {name}")
 
-        # make sure required columns exist
-        required = ["Product Name", "Price", "ID"]
+        file_meta.append((dt, tr, f))
 
-        for col in required:
-            if col not in df.columns:
-                raise ValueError(
-                    f"{file.name} must contain columns: Product Name, Price, ID"
-                )
+    file_meta.sort(key=lambda x: (x[0], x[1]))
 
-        # KEEP ONLY THESE COLUMNS (ignore scraper columns)
-        df = df[["Product Name", "Price", "ID"]].copy()
+    old_file = file_meta[0][2]
+    new_file = file_meta[-1][2]
 
-        # rename internally
-        df.columns = ["Product_Name", "Price", "ID"]
+    old_label = old_file.name.replace(".xlsx", "")
+    new_label = new_file.name.replace(".xlsx", "")
 
-        # clean data
-        df["Price"] = df["Price"].apply(clean_price)
-        df["ID"] = df["ID"].apply(clean_id)
+    old_df = pd.read_excel(old_file)
+    new_df = pd.read_excel(new_file)
 
-        df["Product_Name"] = (
-            df["Product_Name"]
-            .astype(str)
-            .str.replace(r"\s+", " ", regex=True)
-            .str.strip()
-        )
+    old_df.columns = old_df.columns.str.strip()
+    new_df.columns = new_df.columns.str.strip()
 
-        df = df.dropna(subset=["ID", "Price"])
+    required = ["Product Name", "Price", "ID"]
 
-        dfs.append(df)
+    for col in required:
+        if col not in old_df.columns or col not in new_df.columns:
+            raise ValueError("Excel must contain: Product Name, Price, ID")
 
-    if len(dfs) < 2:
-        raise ValueError("Upload at least two Excel files")
+    old_df = old_df[required].copy()
+    new_df = new_df[required].copy()
 
-    old_df = dfs[0]
-    new_df = dfs[-1]
+    old_df.columns = ["Product_Name", "Price", "ID"]
+    new_df.columns = ["Product_Name", "Price", "ID"]
 
-    old_label = labels[0]
-    new_label = labels[-1]
+    old_df["Price"] = old_df["Price"].apply(clean_price)
+    new_df["Price"] = new_df["Price"].apply(clean_price)
+
+    old_df["ID"] = old_df["ID"].apply(clean_id)
+    new_df["ID"] = new_df["ID"].apply(clean_id)
+
+    old_df["Product_Name"] = (
+        old_df["Product_Name"]
+        .astype(str)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
+
+    new_df["Product_Name"] = (
+        new_df["Product_Name"]
+        .astype(str)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
+
+    old_df = old_df.dropna(subset=["ID", "Price"])
+    new_df = new_df.dropna(subset=["ID", "Price"])
 
     merged = old_df.merge(
         new_df,
