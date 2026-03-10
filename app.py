@@ -15,18 +15,16 @@ st.title("📊 Price Change Tracker")
 
 st.info(
 """
-Upload two Excel files.
-
-Required columns in the Excel files:
+Upload Excel files that contain:
 
 Product Name  
 Price  
-ID  
+ID
 
-Extra columns like web_scraper_url or web_scraper_order will be ignored.
+Extra scraper columns will be ignored.
 
-🟢 Green = price increase  
-🔴 Red = price decrease
+The system automatically detects OLD vs NEW file based on filename date and time
+(morning, afternoon, evening).
 """
 )
 
@@ -35,7 +33,6 @@ files = st.file_uploader(
     type=["xlsx"],
     accept_multiple_files=True
 )
-
 
 if st.button("🚀 Generate Price Change Report"):
 
@@ -59,7 +56,6 @@ if st.button("🚀 Generate Price Change Report"):
 
             st.dataframe(df, use_container_width=True)
 
-            # ---------- CREATE EXCEL ----------
             temp_output = BytesIO()
             df.to_excel(temp_output, index=False)
             temp_output.seek(0)
@@ -79,29 +75,29 @@ if st.button("🚀 Generate Price Change Report"):
                 fill_type="solid"
             )
 
-            change_col_letter = None
+            change_col = None
 
             for col in ws.iter_cols(1, ws.max_column):
                 if col[0].value == "Change_Amount":
-                    change_col_letter = col[0].column_letter
+                    change_col = col[0].column_letter
                     break
 
-            last_col_letter = get_column_letter(ws.max_column)
+            last_col = get_column_letter(ws.max_column)
 
-            if change_col_letter:
+            if change_col:
 
                 ws.conditional_formatting.add(
-                    f"A2:{last_col_letter}{ws.max_row}",
+                    f"A2:{last_col}{ws.max_row}",
                     FormulaRule(
-                        formula=[f"VALUE(${change_col_letter}2)>0"],
+                        formula=[f"VALUE(${change_col}2)>0"],
                         fill=green_fill
                     )
                 )
 
                 ws.conditional_formatting.add(
-                    f"A2:{last_col_letter}{ws.max_row}",
+                    f"A2:{last_col}{ws.max_row}",
                     FormulaRule(
-                        formula=[f"VALUE(${change_col_letter}2)<0"],
+                        formula=[f"VALUE(${change_col}2)<0"],
                         fill=red_fill
                     )
                 )
