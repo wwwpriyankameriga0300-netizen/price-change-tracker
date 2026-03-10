@@ -15,16 +15,19 @@ st.title("📊 Price Change Tracker")
 
 st.info(
 """
-Upload Excel files that contain:
+Upload Excel files containing these columns:
 
-Product Name  
-Price  
-ID
+• Product Name  
+• Price  
+• Listing ID  
 
-Extra scraper columns will be ignored.
+Extra columns like `web_scraper_url` or `web_scraper_order` will be ignored.
 
-The system automatically detects OLD vs NEW file based on filename date and time
-(morning, afternoon, evening).
+The system automatically detects **old vs new files** based on the filename
+(morning / afternoon / evening and date).
+
+🟢 Green = price increase  
+🔴 Red = price decrease
 """
 )
 
@@ -33,6 +36,7 @@ files = st.file_uploader(
     type=["xlsx"],
     accept_multiple_files=True
 )
+
 
 if st.button("🚀 Generate Price Change Report"):
 
@@ -56,6 +60,7 @@ if st.button("🚀 Generate Price Change Report"):
 
             st.dataframe(df, use_container_width=True)
 
+            # ---------- CREATE EXCEL ----------
             temp_output = BytesIO()
             df.to_excel(temp_output, index=False)
             temp_output.seek(0)
