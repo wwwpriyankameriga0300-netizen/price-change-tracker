@@ -20,48 +20,47 @@ def clean_price(x):
         return np.nan
 
 
-# ---------- CLEAN ID ----------
+# ---------- CLEAN LISTING ID ----------
 def clean_id(x):
 
     if pd.isna(x):
         return None
 
-    x = str(x)
-    return x.strip()
+    return str(x).strip()
 
 
-# ---------- EXTRACT DATE ----------
+# ---------- EXTRACT DATE FROM FILENAME ----------
 def extract_date(filename):
 
-    m = re.search(r'(\d{1,2})[_-](\d{1,2})[_-](\d{2,4})', filename)
+    match = re.search(r"(\d{1,2})[_-](\d{1,2})[_-](\d{2,4})", filename)
 
-    if not m:
+    if not match:
         return None
 
-    d, mth, y = m.groups()
+    d, m, y = match.groups()
 
     y = int(y)
     if y < 100:
         y += 2000
 
     try:
-        return datetime(y, int(mth), int(d)).date()
+        return datetime(y, int(m), int(d)).date()
     except:
         return None
 
 
-# ---------- TIME RANK ----------
+# ---------- TIME OF DAY RANK ----------
 def time_rank(filename):
 
     name = filename.lower()
 
-    if "morning" in name or re.search(r'\bmor\b', name):
+    if "morning" in name or re.search(r"\bmor\b", name):
         return 0
 
-    if "afternoon" in name or re.search(r'\baft\b', name):
+    if "afternoon" in name or re.search(r"\baft\b", name):
         return 1
 
-    if "evening" in name or re.search(r'\beve\b', name):
+    if "evening" in name or re.search(r"\beve\b", name):
         return 2
 
     return 3
@@ -74,16 +73,17 @@ def generate_price_change_report(files):
 
     for f in files:
 
-        name = f.name
+        filename = f.name
 
-        dt = extract_date(name)
-        tr = time_rank(name)
+        date_value = extract_date(filename)
+        time_value = time_rank(filename)
 
-        if dt is None:
-            raise ValueError(f"Could not detect date in filename: {name}")
+        if date_value is None:
+            raise ValueError(f"Could not detect date in filename: {filename}")
 
-        file_meta.append((dt, tr, f))
+        file_meta.append((date_value, time_value, f))
 
+    # sort by date + time
     file_meta.sort(key=lambda x: (x[0], x[1]))
 
     old_file = file_meta[0][2]
@@ -95,29 +95,34 @@ def generate_price_change_report(files):
     old_df = pd.read_excel(old_file)
     new_df = pd.read_excel(new_file)
 
+    # clean column names
     old_df.columns = old_df.columns.str.strip()
     new_df.columns = new_df.columns.str.strip()
 
-    required = ["Product Name", "Price", "Listing ID"]
+    # normalize names
+    old_df.columns = old_df.columns.str.lower()
+    new_df.columns = new_df.columns.str.lower()
+
+    required = ["product name", "price", "listing id"]
 
     for col in required:
         if col not in old_df.columns or col not in new_df.columns:
             raise ValueError("Excel must contain: Product Name, Price, Listing ID")
 
-    # keep only needed columns
+    # keep only required columns
     old_df = old_df[required].copy()
     new_df = new_df[required].copy()
 
     # rename internally
-    old_df.columns = ["Product_Name", "Price", "ID"]
-    new_df.columns = ["Product_Name", "Price", "ID"]
+    old_df.columns = ["Product_Name", "Price", "Listing_ID"]
+    new_df.columns = ["Product_Name", "Price", "Listing_ID"]
 
-    # clean values
+    # clean data
     old_df["Price"] = old_df["Price"].apply(clean_price)
     new_df["Price"] = new_df["Price"].apply(clean_price)
 
-    old_df["ID"] = old_df["ID"].apply(clean_id)
-    new_df["ID"] = new_df["ID"].apply(clean_id)
+    old_df["Listing_ID"] = old_df["Listing_ID"].apply(clean_id)
+    new_df["Listing_ID"] = new_df["Listing_ID"].apply(clean_id)
 
     old_df["Product_Name"] = (
         old_df["Product_Name"]
@@ -133,12 +138,14 @@ def generate_price_change_report(files):
         .str.strip()
     )
 
-    old_df = old_df.dropna(subset=["ID", "Price"])
-    new_df = new_df.dropna(subset=["ID", "Price"])
+    # remove invalid rows
+    old_df = old_df.dropna(subset=["Listing_ID", "Price"])
+    new_df = new_df.dropna(subset=["Listing_ID", "Price"])
 
+    # merge on listing id
     merged = old_df.merge(
         new_df,
-        on="ID",
+        on="Listing_ID",
         how="inner",
         suffixes=(f" ({old_label})", f" ({new_label})")
     )
@@ -146,6 +153,7 @@ def generate_price_change_report(files):
     old_price = f"Price ({old_label})"
     new_price = f"Price ({new_label})"
 
+    # calculate price difference
     merged["Change_Value"] = (merged[new_price] - merged[old_price]).round(2)
 
     merged = merged[merged["Change_Value"] != 0]
@@ -157,12 +165,11 @@ def generate_price_change_report(files):
     return merged[
         [
             f"Product_Name ({old_label})",
-            "ID",
+            "Listing_ID",
             old_price,
             new_price,
             "Change_Amount",
         ]
     ].rename(columns={
-        f"Product_Name ({old_label})": "Product_Name",
-        "ID": "Listing ID"
+        f"Product_Name ({old_label})": "Product_Name"
     })
