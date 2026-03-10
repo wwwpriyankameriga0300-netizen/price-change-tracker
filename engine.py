@@ -27,9 +27,7 @@ def clean_id(x):
         return None
 
     x = str(x)
-    match = re.search(r"(\d+)$", x)
-
-    return match.group(1) if match else x.strip()
+    return x.strip()
 
 
 # ---------- EXTRACT DATE ----------
@@ -100,18 +98,21 @@ def generate_price_change_report(files):
     old_df.columns = old_df.columns.str.strip()
     new_df.columns = new_df.columns.str.strip()
 
-    required = ["Product Name", "Price", "ID"]
+    required = ["Product Name", "Price", "Listing ID"]
 
     for col in required:
         if col not in old_df.columns or col not in new_df.columns:
-            raise ValueError("Excel must contain: Product Name, Price, ID")
+            raise ValueError("Excel must contain: Product Name, Price, Listing ID")
 
+    # keep only needed columns
     old_df = old_df[required].copy()
     new_df = new_df[required].copy()
 
+    # rename internally
     old_df.columns = ["Product_Name", "Price", "ID"]
     new_df.columns = ["Product_Name", "Price", "ID"]
 
+    # clean values
     old_df["Price"] = old_df["Price"].apply(clean_price)
     new_df["Price"] = new_df["Price"].apply(clean_price)
 
@@ -162,5 +163,6 @@ def generate_price_change_report(files):
             "Change_Amount",
         ]
     ].rename(columns={
-        f"Product_Name ({old_label})": "Product_Name"
+        f"Product_Name ({old_label})": "Product_Name",
+        "ID": "Listing ID"
     })
