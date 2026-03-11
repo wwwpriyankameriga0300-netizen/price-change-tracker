@@ -26,7 +26,19 @@ def clean_id(x):
     if pd.isna(x):
         return None
 
-    return str(x).strip()
+    x = str(x).strip()
+
+    # BIDBUD URL
+    m = re.search(r"/(\d+)$", x)
+    if m:
+        return m.group(1)
+
+    # KOGAN IMAGE URL
+    m = re.search(r"/images/[^/]+/([^/]+)/", x)
+    if m:
+        return m.group(1)
+
+    return x
 
 
 # ---------- EXTRACT DATE FROM FILENAME ----------
@@ -83,7 +95,7 @@ def generate_price_change_report(files):
 
         file_meta.append((date_value, time_value, f))
 
-    # sort by date + time
+    # sort files by date + time
     file_meta.sort(key=lambda x: (x[0], x[1]))
 
     old_file = file_meta[0][2]
@@ -99,7 +111,7 @@ def generate_price_change_report(files):
     old_df.columns = old_df.columns.str.strip()
     new_df.columns = new_df.columns.str.strip()
 
-    # normalize names
+    # normalize column names
     old_df.columns = old_df.columns.str.lower()
     new_df.columns = new_df.columns.str.lower()
 
