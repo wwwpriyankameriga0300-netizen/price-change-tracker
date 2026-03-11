@@ -28,16 +28,17 @@ def clean_id(x):
 
     x = str(x).strip()
 
-    # BIDBUD URL
-    m = re.search(r"/(\d+)$", x)
-    if m:
-        return m.group(1)
-
     # KOGAN IMAGE URL
     m = re.search(r"/images/[^/]+/([^/]+)/", x)
     if m:
         return m.group(1)
 
+    # BIDBUD URL
+    m = re.search(r"/(\d+)", x)
+    if m:
+        return m.group(1)
+
+    # If already ID
     return x
 
 
@@ -95,7 +96,6 @@ def generate_price_change_report(files):
 
         file_meta.append((date_value, time_value, f))
 
-    # sort files by date + time
     file_meta.sort(key=lambda x: (x[0], x[1]))
 
     old_file = file_meta[0][2]
@@ -111,7 +111,7 @@ def generate_price_change_report(files):
     old_df.columns = old_df.columns.str.strip()
     new_df.columns = new_df.columns.str.strip()
 
-    # normalize column names
+    # normalize names
     old_df.columns = old_df.columns.str.lower()
     new_df.columns = new_df.columns.str.lower()
 
@@ -121,15 +121,12 @@ def generate_price_change_report(files):
         if col not in old_df.columns or col not in new_df.columns:
             raise ValueError("Excel must contain: Product Name, Price, Listing ID")
 
-    # keep only required columns
     old_df = old_df[required].copy()
     new_df = new_df[required].copy()
 
-    # rename internally
     old_df.columns = ["Product_Name", "Price", "Listing_ID"]
     new_df.columns = ["Product_Name", "Price", "Listing_ID"]
 
-    # clean data
     old_df["Price"] = old_df["Price"].apply(clean_price)
     new_df["Price"] = new_df["Price"].apply(clean_price)
 
@@ -150,11 +147,9 @@ def generate_price_change_report(files):
         .str.strip()
     )
 
-    # remove invalid rows
     old_df = old_df.dropna(subset=["Listing_ID", "Price"])
     new_df = new_df.dropna(subset=["Listing_ID", "Price"])
 
-    # merge on listing id
     merged = old_df.merge(
         new_df,
         on="Listing_ID",
@@ -165,7 +160,6 @@ def generate_price_change_report(files):
     old_price = f"Price ({old_label})"
     new_price = f"Price ({new_label})"
 
-    # calculate price difference
     merged["Change_Value"] = (merged[new_price] - merged[old_price]).round(2)
 
     merged = merged[merged["Change_Value"] != 0]
